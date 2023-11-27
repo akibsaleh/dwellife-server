@@ -28,26 +28,52 @@ async function run() {
     // JWT Token
     app.post('/jwt', async (req, res) => {
       const user = await req.body;
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '1h'});
-      res.send({token});
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+      res.send({ token });
     });
 
     // Custom middlewares
 
-    // Verify JWT Token 
+    // Verify JWT Token
 
     const verifyToken = async (req, res, next) => {
-      if(!req.headers.authorization) {
-        return res.status(401).send({message: 'UnAuthorized Access'});
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'UnAuthorized Access' });
       }
       const token = req.headers.authorization.split(' ')[1];
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-        if(err) {
-          return res.status(401).send({message: 'Forbidden Access'});
+        if (err) {
+          return res.status(401).send({ message: 'Forbidden Access' });
         }
         req.decoded = decoded;
         next();
-      })
+      });
+    };
+
+    // Verify Admin
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = await req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== 'admin') {
+        return res.status(403).send({ message: 'Forbidden Access' });
+      }
+
+      next();
+    };
+
+    // Verify Member
+
+    const verifyMember = async (req, res, next) => {
+      const email = await req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== 'member') {
+        return res.status(403).send({ message: 'Forbidden Access' });
+      }
+
+      next();
     };
 
     // Get All apartments data
@@ -61,24 +87,66 @@ async function run() {
         apartments: result[1],
       });
     });
+
+    // Check if the usr is admin or not
+
+    app.get('/api/users/admin/:email', verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if(email !== req.decoded.email) {
+        return res.status(403).send({ message : 'Forbidden access'});
+      }
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user.role === 'admin';
+      }
+      return res.send({ admin });
+    })
+
+    //Get users in Database
+
+    app.get('/api/users', verifyToken, verifyAdmin, async (req, res) => {
+      const role = req.query.role;
+      const query = { role: role };
+      const result = await usersCollection.find(query).toArray();
+      return res.send(result);
+    })
+
     // save users in Database
     app.post('/api/users', async (req, res) => {
       const user = req.body;
-      const query = { email : user.email};
+      const query = { email: user.email };
       const isExist = await usersCollection.findOne(query);
-      if(!isExist){
+      if (!isExist) {
         const result = await usersCollection.insertOne(user);
         res.send(result);
-      } else{
-        res.send({ message: 'User Already Exists', InsertedId: null});
+      } else {
+        res.send({ message: 'User Already Exists', InsertedId: null });
       }
     });
 
-    app.post('/api/agreement', verifyToken , async (req, res) => {
+    // save agreements in Database
+    app.post('/api/agreement', verifyToken, async (req, res) => {
       const agreementInfo = req.body;
       const result = await agreementsCollection.insertOne(agreementInfo);
       res.send(result);
     });
+
+    // remove members and update users
+
+    app.patch('/api/remove-member', verifyToken, verifyAdmin, async (req, res) => {
+      const email = req.body.email;
+      console.log(email);
+      const filter = { email: email };
+      const updateDoc = {
+        $set: {
+          role: 'user',
+        }
+      }
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 });
