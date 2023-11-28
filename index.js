@@ -25,6 +25,7 @@ async function run() {
     const apartmentsCollection = client.db('dwellife').collection('apartments');
     const usersCollection = client.db('dwellife').collection('users');
     const agreementsCollection = client.db('dwellife').collection('agreements');
+    const announcementsCollection = client.db('dwellife').collection('announcements');
     // JWT Token
     app.post('/jwt', async (req, res) => {
       const user = await req.body;
@@ -88,6 +89,11 @@ async function run() {
       });
     });
 
+    app.get('/api/announcements', verifyToken, async (req, res) => {
+      const result = await announcementsCollection.find().toArray();
+      res.send(result);
+    })
+
     // Check if the usr is admin or not
 
     app.get('/api/users/admin/:email', verifyToken, async (req, res) => {
@@ -102,7 +108,7 @@ async function run() {
         admin = user.role === 'admin';
       }
       return res.send({ admin });
-    })
+    });
 
     //Get users in Database
 
@@ -132,6 +138,14 @@ async function run() {
       const result = await agreementsCollection.insertOne(agreementInfo);
       res.send(result);
     });
+
+    //save announcements in Database
+
+    app.post('/api/announcements', verifyToken, verifyAdmin, async (req, res) => {
+      const announcementInfo = req.body;
+      const result = await announcementsCollection.insertOne(announcementInfo);
+      res.send(result);
+    })
 
     // remove members and update users
 
