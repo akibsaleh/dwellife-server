@@ -26,6 +26,7 @@ async function run() {
     const usersCollection = client.db('dwellife').collection('users');
     const agreementsCollection = client.db('dwellife').collection('agreements');
     const announcementsCollection = client.db('dwellife').collection('announcements');
+    const couponsCollection = client.db('dwellife').collection('coupons');
     // JWT Token
     app.post('/jwt', async (req, res) => {
       const user = await req.body;
@@ -77,6 +78,22 @@ async function run() {
       next();
     };
 
+    // Check if the usr is admin or not
+
+    app.get('/api/users/admin/:email', verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'Forbidden access' });
+      }
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user.role === 'admin';
+      }
+      return res.send({ admin });
+    });
+
     // Get All apartments data
     app.get('/api/apartments', async (req, res) => {
       const pageQuery = req.query.page;
@@ -89,26 +106,20 @@ async function run() {
       });
     });
 
+    // Get All Announcements data
+
     app.get('/api/announcements', verifyToken, async (req, res) => {
       const result = await announcementsCollection.find().toArray();
       res.send(result);
-    })
-
-    // Check if the usr is admin or not
-
-    app.get('/api/users/admin/:email', verifyToken, async (req, res) => {
-      const email = req.params.email;
-      if(email !== req.decoded.email) {
-        return res.status(403).send({ message : 'Forbidden access'});
-      }
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      let admin = false;
-      if (user) {
-        admin = user.role === 'admin';
-      }
-      return res.send({ admin });
     });
+
+    // Get All Coupons data
+
+    app.get('/api/coupons', verifyToken, async (req, res) => {
+      const result = await couponsCollection.find().toArray();
+      res.send(result);
+    });
+
 
     //Get users in Database
 
@@ -117,7 +128,7 @@ async function run() {
       const query = { role: role };
       const result = await usersCollection.find(query).toArray();
       return res.send(result);
-    })
+    });
 
     // save users in Database
     app.post('/api/users', async (req, res) => {
@@ -145,7 +156,15 @@ async function run() {
       const announcementInfo = req.body;
       const result = await announcementsCollection.insertOne(announcementInfo);
       res.send(result);
-    })
+    });
+
+    //save coupons in Database
+
+    app.post('/api/coupons', verifyToken, verifyAdmin, async (req, res) => {
+      const couponInfo = req.body;
+      const result = await couponsCollection.insertOne(couponInfo);
+      res.send(result);
+    });
 
     // remove members and update users
 
@@ -156,11 +175,11 @@ async function run() {
       const updateDoc = {
         $set: {
           role: 'user',
-        }
-      }
+        },
+      };
       const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
-    })
+    });
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 });
