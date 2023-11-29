@@ -94,6 +94,22 @@ async function run() {
       return res.send({ admin });
     });
 
+    // Check if the usr is member or not
+
+    app.get('/api/users/member/:email', verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'Forbidden access' });
+      }
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let member = false;
+      if (user) {
+        member = user.role === 'member';
+      }
+      return res.send({ member });
+    });
+
     // Get All apartments data
     app.get('/api/apartments', async (req, res) => {
       const pageQuery = req.query.page;
