@@ -113,10 +113,22 @@ async function run() {
       res.send(result);
     });
 
-    // Get All Coupons data
+    // Get All agreements data
 
+    app.get('/api/agreements', verifyToken, verifyAdmin, async (req, res) => {
+      const result = await agreementsCollection.find().toArray();
+      res.send(result);
+    });
+
+    // Get All Coupons data
     app.get('/api/coupons', verifyToken, async (req, res) => {
       const result = await couponsCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.get('/api/available-coupons', async (req, res) => {
+      const query = { available: true };
+      const result = await couponsCollection.find(query).toArray();
       res.send(result);
     });
 
@@ -164,6 +176,64 @@ async function run() {
       const couponInfo = req.body;
       const result = await couponsCollection.insertOne(couponInfo);
       res.send(result);
+    });
+
+    // Delete Coupon
+
+    app.delete('/api/coupons/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await couponsCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // update coupon availability;
+
+    app.patch('/api/coupons/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const available = req.body.available;
+      const query = { _id : new ObjectId(id)};
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          available: available,
+        }
+      };
+      const result = await couponsCollection.updateOne(query, updateDoc, options);
+      res.send(result);
+    });
+
+    // update Agreement status
+
+    app.patch('/api/agreements/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const status = req.body.status;
+      const query = { _id : new ObjectId(id)};
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          status: status,
+        }
+      };
+      const result = await agreementsCollection.updateOne(query, updateDoc, options);
+      res.send(result);
+    });
+
+    // update user role
+
+    app.patch('/api/users/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const email = req.params.id;
+      const role = req.body.role;
+      const query = {email : email};
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          role: role,
+        }
+      }
+      const result = await usersCollection.updateOne(query, updateDoc, options);
+      res.send(result);
+    
     });
 
     // remove members and update users
