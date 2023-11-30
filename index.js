@@ -28,6 +28,7 @@ async function run() {
     const agreementsCollection = client.db('dwellife').collection('agreements');
     const announcementsCollection = client.db('dwellife').collection('announcements');
     const couponsCollection = client.db('dwellife').collection('coupons');
+    const paymentHistoryCollection = client.db('dwellife').collection('paymentHistory');
     // JWT Token
     app.post('/jwt', async (req, res) => {
       const user = await req.body;
@@ -178,6 +179,15 @@ async function run() {
       return res.send(result);
     });
 
+    // Get Payment history from Database
+
+    app.get('/api/payment-history', verifyToken, async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const result = await paymentHistoryCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // save users in Database
     app.post('/api/users', async (req, res) => {
       const user = req.body;
@@ -301,6 +311,27 @@ async function run() {
         clientSecret : paymentIntent.client_secret,
       });
     });
+
+    // Payment history
+
+    app.post('/api/payment-history',verifyToken, async (req, res) => {
+      const paymentInfo = req.body;
+      console.log("🚀 ~ file: index.js:310 ~ app.post ~ paymentInfo:", paymentInfo)
+      console.log("🚀 ~ file: index.js:310 ~ app.post ~ paymentInfo month:", paymentInfo.month);
+      const result = await paymentHistoryCollection.insertOne(paymentInfo);
+      const agQuery = { email : paymentInfo.email };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          lastPayment: paymentInfo.paymentDate,
+          month: paymentInfo.month,
+        }
+      }
+      const agResult = await agreementsCollection.updateOne(agQuery, updateDoc, options);
+      res.send(result);
+    });
+
+
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 });
