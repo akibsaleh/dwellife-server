@@ -138,6 +138,16 @@ async function run() {
       res.send(result);
     });
 
+    // get single agreement data
+    app.get('/api/single-agreement', verifyToken, async (req, res) => {
+      const email = req.query.email;
+      console.log('email', email);
+      const query = { email: email };
+      const result = await agreementsCollection.findOne(query);
+      console.log(result);
+      res.send(result);
+    });
+
     // get user specific agreement data
 
     app.get('/api/make-payment', verifyToken, verifyMember, async (req, res) => {
@@ -145,7 +155,7 @@ async function run() {
       const query = { email: email };
       const result = await agreementsCollection.findOne(query);
       res.send(result);
-    })
+    });
 
     // Get All Coupons data
     app.get('/api/coupons', verifyToken, verifyAdmin, async (req, res) => {
@@ -183,9 +193,29 @@ async function run() {
 
     app.get('/api/payment-history', verifyToken, async (req, res) => {
       const email = req.query.email;
+      const month = req.query.month;
       const query = { email: email };
       const result = await paymentHistoryCollection.find(query).toArray();
+      if (month) {
+        const searchedResult = result.filter((item) => {
+          const itemMonth = item.month.split(',').map((item) => item.toLowerCase());
+          return itemMonth.includes(month);
+        });
+        return res.send(searchedResult);
+      }
       res.send(result);
+    });
+
+    app.get('/api/admin-profile-info', verifyToken, verifyAdmin, async (req, res) => {
+      const totalApartments = await apartmentsCollection.estimatedDocumentCount();
+      const totalUsers = await usersCollection.estimatedDocumentCount();
+      const memberQuery = { role: 'member' };
+      const totalMembers = await usersCollection.countDocuments(memberQuery);
+      const percentageOfAvailableApartments = ((totalApartments - totalMembers) / totalApartments) * 100;
+      const percentageOfRentedApartments = 100 - percentageOfAvailableApartments;
+      res.json({
+        totalApartments,totalUsers,totalMembers,percentageOfAvailableApartments,percentageOfRentedApartments
+      });
     });
 
     // save users in Database
@@ -238,12 +268,12 @@ async function run() {
     app.patch('/api/coupons/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const available = req.body.available;
-      const query = { _id : new ObjectId(id)};
+      const query = { _id: new ObjectId(id) };
       const options = { upsert: true };
       const updateDoc = {
         $set: {
           available: available,
-        }
+        },
       };
       const result = await couponsCollection.updateOne(query, updateDoc, options);
       res.send(result);
@@ -254,12 +284,14 @@ async function run() {
     app.patch('/api/agreements/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const status = req.body.status;
-      const query = { _id : new ObjectId(id)};
+      const date = req.body.date;
+      const query = { _id: new ObjectId(id) };
       const options = { upsert: true };
       const updateDoc = {
         $set: {
           status: status,
-        }
+          date: date,
+        },
       };
       const result = await agreementsCollection.updateOne(query, updateDoc, options);
       res.send(result);
@@ -270,16 +302,15 @@ async function run() {
     app.patch('/api/users/:id', verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.id;
       const role = req.body.role;
-      const query = {email : email};
+      const query = { email: email };
       const options = { upsert: true };
       const updateDoc = {
         $set: {
           role: role,
-        }
-      }
+        },
+      };
       const result = await usersCollection.updateOne(query, updateDoc, options);
       res.send(result);
-    
     });
 
     // remove members and update users
@@ -300,38 +331,36 @@ async function run() {
     // Payment Intent
 
     app.post('/api/create-payment-intent', async (req, res) => {
-      const {rent} = req.body;
-      const amount = parseInt(rent*100);
+      const { rent } = req.body;
+      const amount = parseInt(rent * 100);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: 'usd',
         payment_method_types: ['card'],
-    });
+      });
       res.send({
-        clientSecret : paymentIntent.client_secret,
+        clientSecret: paymentIntent.client_secret,
       });
     });
 
     // Payment history
 
-    app.post('/api/payment-history',verifyToken, async (req, res) => {
+    app.post('/api/payment-history', verifyToken, async (req, res) => {
       const paymentInfo = req.body;
-      console.log("🚀 ~ file: index.js:310 ~ app.post ~ paymentInfo:", paymentInfo)
-      console.log("🚀 ~ file: index.js:310 ~ app.post ~ paymentInfo month:", paymentInfo.month);
+      console.log('🚀 ~ file: index.js:310 ~ app.post ~ paymentInfo:', paymentInfo);
+      console.log('🚀 ~ file: index.js:310 ~ app.post ~ paymentInfo month:', paymentInfo.month);
       const result = await paymentHistoryCollection.insertOne(paymentInfo);
-      const agQuery = { email : paymentInfo.email };
+      const agQuery = { email: paymentInfo.email };
       const options = { upsert: true };
       const updateDoc = {
         $set: {
           lastPayment: paymentInfo.paymentDate,
           month: paymentInfo.month,
-        }
-      }
+        },
+      };
       const agResult = await agreementsCollection.updateOne(agQuery, updateDoc, options);
       res.send(result);
     });
-
-
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 });
