@@ -1,10 +1,11 @@
 const express = require('express');
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
-const app = express();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+
+const app = express();
 const port = process.env.PORT || 5000;
 
 // MiddleWares
@@ -141,10 +142,8 @@ async function run() {
     // get single agreement data
     app.get('/api/single-agreement', verifyToken, async (req, res) => {
       const email = req.query.email;
-      console.log('email', email);
       const query = { email: email };
       const result = await agreementsCollection.findOne(query);
-      console.log(result);
       res.send(result);
     });
 
@@ -317,7 +316,6 @@ async function run() {
 
     app.patch('/api/remove-member', verifyToken, verifyAdmin, async (req, res) => {
       const email = req.body.email;
-      console.log(email);
       const filter = { email: email };
       const updateDoc = {
         $set: {
@@ -347,8 +345,6 @@ async function run() {
 
     app.post('/api/payment-history', verifyToken, async (req, res) => {
       const paymentInfo = req.body;
-      console.log('🚀 ~ file: index.js:310 ~ app.post ~ paymentInfo:', paymentInfo);
-      console.log('🚀 ~ file: index.js:310 ~ app.post ~ paymentInfo month:', paymentInfo.month);
       const result = await paymentHistoryCollection.insertOne(paymentInfo);
       const agQuery = { email: paymentInfo.email };
       const options = { upsert: true };
